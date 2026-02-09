@@ -215,6 +215,59 @@
   .share-copied {
     color: #34d399 !important; border-color: #34d399 !important;
   }
+
+  /* Mobile optimizations */
+  .mobile-column-tabs { display: none; }
+  .mobile-move-btn { display: none; }
+  @media (max-width: 1023px) {
+    .mobile-column-tabs {
+      display: flex; gap: 4px; padding: 0 4px; margin-bottom: 12px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .mobile-tab {
+      flex: 1; min-width: 0; padding: 8px 4px;
+      border-radius: 10px; background: rgba(30, 41, 59, 0.8);
+      color: #94a3b8; font-size: 13px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 6px; transition: all 0.15s;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .mobile-tab-active {
+      background: rgba(99, 102, 241, 0.15);
+      color: white; border-color: rgba(99, 102, 241, 0.4);
+    }
+    .mobile-tab-badge {
+      font-size: 11px; font-weight: 700;
+      background: rgba(255,255,255,0.1);
+      padding: 1px 7px; border-radius: 9999px;
+    }
+    .mobile-tab-active .mobile-tab-badge {
+      background: rgba(99, 102, 241, 0.3);
+    }
+    .column-container {
+      min-width: 0 !important; max-width: none !important;
+      flex: 1 1 100% !important;
+    }
+    .columns-scroll-wrapper::after { display: none; }
+    .card-actions {
+      opacity: 1; position: static;
+      background: transparent !important;
+      padding-left: 0 !important;
+    }
+    .grip-handle { display: none; }
+    .task-card { cursor: default; }
+    .task-card:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    .mobile-move-btn { display: flex; }
+    .todo-delete-btn { opacity: 1 !important; }
+  }
+  @media (max-width: 639px) {
+    .search-filter-bar { flex-wrap: wrap; }
+    .search-input-wrapper { flex: 1 1 100% !important; max-width: none !important; margin-bottom: 8px; }
+    .header-actions-group {
+      position: static !important; transform: none !important;
+      justify-content: center; margin-top: 8px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -386,6 +439,14 @@ function ShareIcon() {
   );
 }
 
+function MoreDotsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+    </svg>
+  );
+}
+
 // Error Boundary
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -408,6 +469,54 @@ class ErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
+}
+
+// Mobile column tabs
+function ColumnTabs({ activeTab, onTabChange, tasksByColumn }) {
+  return (
+    <div className="mobile-column-tabs" style={{ maxWidth: '1600px', margin: '0 auto' }}>
+      {COLUMNS.map(col => (
+        <button
+          key={col.id}
+          onClick={() => onTabChange(col.id)}
+          className={`mobile-tab ${activeTab === col.id ? 'mobile-tab-active' : ''}`}
+        >
+          <span>{col.title}</span>
+          <span className="mobile-tab-badge">{tasksByColumn[col.id].length}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Mobile more menu (Share/Export/Import)
+function MoreMenu({ onShare, onExport, onImport, shareCopied }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative sm:hidden" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="header-action-btn flex items-center justify-center" aria-label="More actions" style={{ padding: '6px 8px' }}>
+        <MoreDotsIcon />
+      </button>
+      {open && (
+        <div className="move-menu" style={{ right: 0, top: '100%', marginTop: '4px', zIndex: 40 }}>
+          <button className="move-menu-item" onClick={() => { onShare(); setOpen(false); }}>{shareCopied ? 'Copied!' : 'Share Link'}</button>
+          <button className="move-menu-item" onClick={() => { onExport(); setOpen(false); }}>Export</button>
+          <button className="move-menu-item" onClick={() => { onImport(); setOpen(false); }}>Import</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Task Modal with focus trap + ARIA
@@ -554,7 +663,7 @@ function UndoToast({ message, onUndo, onDismiss }) {
   );
 }
 
-// Task Card
+// Task Card with mobile move menu
 function TaskCard({ task, onEdit, onDelete, onMove, isDone }) {
   const cat = getCat(task.category);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -600,7 +709,7 @@ function TaskCard({ task, onEdit, onDelete, onMove, isDone }) {
         title="Drag to move"
       >
         <div className="flex items-center gap-2 relative">
-          <div className="flex-shrink-0 text-gray-400 hover:text-gray-300 cursor-grab" style={{ transition: 'color 0.15s' }}>
+          <div className="grip-handle flex-shrink-0 text-gray-400 hover:text-gray-300 cursor-grab" style={{ transition: 'color 0.15s' }}>
             <GripIcon />
           </div>
           <div className="flex-1 min-w-0">
@@ -620,10 +729,22 @@ function TaskCard({ task, onEdit, onDelete, onMove, isDone }) {
             <button onClick={() => onEdit(task)} className="action-btn text-gray-400 hover:text-blue-400 rounded-md hover:bg-gray-700" aria-label="Edit task" title="Edit">
               <PencilIcon />
             </button>
+            <button onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }} className="action-btn text-gray-400 hover:text-green-400 rounded-md hover:bg-gray-700 mobile-move-btn" aria-label="Move task" title="Move to column">
+              <ArrowIcon />
+            </button>
             <button onClick={() => setConfirmDelete(true)} className="action-btn text-gray-400 hover:text-red-400 rounded-md hover:bg-gray-700" aria-label="Delete task" title="Delete">
               <XIcon />
             </button>
           </div>
+          {showMoveMenu && (
+            <div ref={moveMenuRef} className="move-menu" style={{ right: 0, top: '100%', marginTop: '4px' }}>
+              {COLUMNS.filter(c => c.id !== task.columnId).map(col => (
+                <button key={col.id} className="move-menu-item" onClick={() => { onMove(task.id, col.id); setShowMoveMenu(false); }}>
+                  {col.title}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {confirmDelete && (
@@ -636,10 +757,12 @@ function TaskCard({ task, onEdit, onDelete, onMove, isDone }) {
 }
 
 // Column with intra-column reordering
-function Column({ column, tasks, onAddClick, onEditTask, onDeleteTask, onDrop, onMoveTask, onClearDone }) {
+function Column({ column, tasks, onAddClick, onEditTask, onDeleteTask, onDrop, onMoveTask, onClearDone, hidden }) {
   const [dragOver, setDragOver] = useState(false);
   const [insertBeforeId, setInsertBeforeId] = useState(null);
   const isDone = column.id === 'done';
+
+  if (hidden) return null;
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -915,7 +1038,7 @@ function PersonalSidebar({ todos, updateTodos, onClose }) {
               )}
               <button
                 onClick={() => deleteTodo(todo.id)}
-                className="action-btn p-1.5 text-gray-500 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
+                className="todo-delete-btn action-btn p-1.5 text-gray-500 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
                 style={{ minWidth: '28px', minHeight: '28px' }}
                 aria-label="Delete to-do"
                 title="Delete"
@@ -970,11 +1093,20 @@ function App() {
   const [filterCategory, setFilterCategory] = useState('');
   const [undoTask, setUndoTask] = useState(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [mobileColumnTab, setMobileColumnTab] = useState('triage');
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const undoTimerRef = useRef(null);
 
   const tasksRef = useRef([]);
   const todosRef = useRef([]);
   const boardRef = useRef(null);
+
+  // Track mobile breakpoint
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   // Firebase init + listeners
   useEffect(() => {
@@ -982,7 +1114,6 @@ function App() {
     boardRef.current = bRef;
 
     auth.signInAnonymously().then(() => {
-      // Check if Firebase has data; if not, migrate from localStorage
       bRef.child('tasks').once('value').then(snap => {
         if (!snap.val()) {
           try {
@@ -995,7 +1126,6 @@ function App() {
         localStorage.removeItem(KANBAN_KEY);
         localStorage.removeItem(TODOS_KEY);
 
-        // Real-time listener for tasks
         bRef.child('tasks').on('value', snapshot => {
           const arr = toArray(snapshot.val());
           tasksRef.current = arr;
@@ -1003,7 +1133,6 @@ function App() {
           setLoading(false);
         });
 
-        // Real-time listener for todos
         bRef.child('todos').on('value', snapshot => {
           const arr = toArray(snapshot.val());
           todosRef.current = arr;
@@ -1011,7 +1140,6 @@ function App() {
         });
       });
     }).catch(() => {
-      // Auth failed, fall back to localStorage
       try { setTasks(JSON.parse(localStorage.getItem(KANBAN_KEY) || '[]')); } catch {}
       try { setTodos(JSON.parse(localStorage.getItem(TODOS_KEY) || '[]')); } catch {}
       setLoading(false);
@@ -1023,7 +1151,6 @@ function App() {
     };
   }, [boardId]);
 
-  // Update tasks: local state + Firebase
   const updateTasks = useCallback((updater) => {
     const next = typeof updater === 'function' ? updater(tasksRef.current) : updater;
     tasksRef.current = next;
@@ -1031,7 +1158,6 @@ function App() {
     if (boardRef.current) boardRef.current.child('tasks').set(next);
   }, []);
 
-  // Update todos: local state + Firebase
   const updateTodos = useCallback((updater) => {
     const next = typeof updater === 'function' ? updater(todosRef.current) : updater;
     todosRef.current = next;
@@ -1039,7 +1165,7 @@ function App() {
     if (boardRef.current) boardRef.current.child('todos').set(next);
   }, []);
 
-  // Keyboard shortcut: N to add new task
+  // Keyboard shortcut: N to add new task (desktop only)
   useEffect(() => {
     const handleKey = (e) => {
       const tag = document.activeElement?.tagName;
@@ -1102,7 +1228,6 @@ function App() {
     }
   }, [editingTask, activeColumnId, updateTasks]);
 
-  // Drop with intra-column reordering
   const handleDrop = useCallback((taskId, targetColumnId, insertBeforeTaskId) => {
     if (taskId === insertBeforeTaskId) return;
     updateTasks(prev => {
@@ -1135,7 +1260,6 @@ function App() {
     }
   }, [updateTasks]);
 
-  // Export
   const handleExport = useCallback(() => {
     const data = JSON.stringify({ tasks: tasksRef.current, version: 2 }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
@@ -1147,7 +1271,6 @@ function App() {
     URL.revokeObjectURL(url);
   }, []);
 
-  // Import
   const handleImport = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1169,19 +1292,16 @@ function App() {
     input.click();
   }, [updateTasks]);
 
-  // Share link
   const handleShare = useCallback(() => {
     const url = window.location.origin + window.location.pathname + '#' + boardId;
     navigator.clipboard.writeText(url).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
     }).catch(() => {
-      // Fallback: select text
       prompt('Copy this link to share your board:', url);
     });
   }, [boardId]);
 
-  // Filtered tasks
   const tasksByColumn = useMemo(() => {
     const map = {};
     COLUMNS.forEach(col => { map[col.id] = []; });
@@ -1194,7 +1314,6 @@ function App() {
     return map;
   }, [tasks, searchQuery, filterCategory]);
 
-  // Loading screen
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1211,7 +1330,7 @@ function App() {
       <header className="text-center mb-4 relative">
         <h1 className="text-3xl sm:text-4xl font-bold title-gradient mb-1">Marketing Projects Board</h1>
         <p className="text-gray-400 text-xs tracking-wide">{getGreeting()} &middot; {getFormattedDate()}</p>
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        <div className="header-actions-group absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
           <button
             onClick={handleShare}
             className={`header-action-btn hidden sm:flex items-center gap-1.5 ${shareCopied ? 'share-copied' : ''}`}
@@ -1235,8 +1354,8 @@ function App() {
       </header>
 
       {/* Search + Filter bar */}
-      <div className="flex items-center gap-3 mb-4 px-1" style={{ maxWidth: '1600px', margin: '0 auto 16px' }}>
-        <div className="relative flex-1" style={{ maxWidth: '320px' }}>
+      <div className="search-filter-bar flex items-center gap-3 mb-4 px-1" style={{ maxWidth: '1600px', margin: '0 auto 16px' }}>
+        <div className="search-input-wrapper relative flex-1" style={{ maxWidth: '320px' }}>
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"><SearchIcon /></div>
           <input
             type="text"
@@ -1261,18 +1380,12 @@ function App() {
         {(searchQuery || filterCategory) && (
           <button onClick={() => { setSearchQuery(''); setFilterCategory(''); }} className="text-xs text-gray-400 hover:text-white transition-colors">Clear</button>
         )}
-        {/* Mobile buttons */}
-        <button
-          onClick={handleShare}
-          className={`header-action-btn sm:hidden flex items-center gap-1.5 ${shareCopied ? 'share-copied' : ''}`}
-          title="Copy share link"
-        >
-          <ShareIcon />
-          {shareCopied ? 'Copied!' : 'Share'}
-        </button>
-        <button onClick={handleExport} className="header-action-btn sm:hidden" title="Export">Export</button>
-        <button onClick={handleImport} className="header-action-btn sm:hidden" title="Import">Import</button>
+        {/* Mobile: three-dot menu replaces individual buttons */}
+        <MoreMenu onShare={handleShare} onExport={handleExport} onImport={handleImport} shareCopied={shareCopied} />
       </div>
+
+      {/* Mobile column tabs */}
+      <ColumnTabs activeTab={mobileColumnTab} onTabChange={setMobileColumnTab} tasksByColumn={tasksByColumn} />
 
       <div className="flex gap-5 px-1" style={{ maxWidth: '1600px', margin: '0 auto' }}>
         <div className="columns-scroll-wrapper flex-1 min-w-0">
@@ -1288,6 +1401,7 @@ function App() {
                 onDrop={handleDrop}
                 onMoveTask={handleMoveTask}
                 onClearDone={column.id === 'done' ? clearDoneColumn : undefined}
+                hidden={isMobile && column.id !== mobileColumnTab}
               />
             ))}
           </div>
@@ -1310,7 +1424,6 @@ function App() {
         defaultColumn={activeColumnId}
       />
 
-      {/* Undo toast */}
       {undoTask && (
         <UndoToast
           message="Task deleted"
@@ -1319,7 +1432,7 @@ function App() {
         />
       )}
 
-      {/* Keyboard hint */}
+      {/* Keyboard hint - desktop only */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-xs hidden lg:block" style={{ pointerEvents: 'none' }}>
         Press <kbd className="px-1.5 py-0.5 rounded text-gray-300" style={{ background: '#1e293b', border: '1px solid #475569' }}>N</kbd> to add a new task
       </div>
